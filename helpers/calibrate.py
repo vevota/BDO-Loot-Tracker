@@ -59,6 +59,43 @@ MIN_SIZE    = 40          # minimum box dimension in px
 # Debug image is written next to this script each time OCR is confirmed
 DEBUG_IMAGE_PATH = Path(__file__).parent / "calibration_debug.png"
 
+
+def _pick_monitor() -> str:
+    """Prompt user to click on the BDO monitor via slurp -o, save to .env."""
+    env_path = TRACKER_FILE.parent / ".env"
+    from dotenv import load_dotenv
+    load_dotenv(env_path)
+    existing = os.getenv("MONITOR_OUTPUT", "")
+    if existing:
+        return existing
+
+    root = tk.Tk()
+    root.withdraw()
+    messagebox.showinfo(
+        "Select Monitor",
+        "Click anywhere on the monitor where BDO is running.\n\n"
+        "Your cursor will turn into a crosshair."
+    )
+    root.destroy()
+
+    try:
+        output = subprocess.run(
+            ['slurp', '-o'], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        if not output:
+            return ""
+        lines = []
+        if env_path.exists():
+            lines = env_path.read_text().splitlines()
+        lines = [l for l in lines if not l.startswith("MONITOR_OUTPUT=")]
+        lines.append(f"MONITOR_OUTPUT={output}")
+        env_path.write_text("\n".join(lines) + "\n")
+        os.environ["MONITOR_OUTPUT"] = output
+        return output
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"Monitor selection failed: {e}")
+        return ""
+
 # ═════════════════════════════════════════════════════════════
 class CalibrationApp:
 
@@ -74,8 +111,10 @@ class CalibrationApp:
             self.full_img = source_image.convert("RGB")
             self.screen_w, self.screen_h = self.full_img.size
         else:
-            # Live mode: grab all monitors via grim (Wayland-native).
-            result = subprocess.run(['grim', '-'], capture_output=True, check=True)
+            # Live mode: capture the selected monitor (or all if none selected).
+            monitor_output = _pick_monitor()
+            out_flag = ['-o', monitor_output] if monitor_output else []
+            result = subprocess.run(['grim'] + out_flag + ['-'], capture_output=True, check=True)
             self.full_img = Image.open(io.BytesIO(result.stdout)).convert("RGB")
             self.screen_w, self.screen_h = self.full_img.size
 
