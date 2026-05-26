@@ -14,7 +14,7 @@ from .uploader import LootEvent
 from .config import (
     POLL_INTERVAL,
     CHARACTER_NAME,
-    MONITOR_OUTPUT,
+    MONITOR_GEOMETRY,
     REGION_LEFT_PCT,
     REGION_TOP_PCT,
     REGION_RIGHT_PCT,
@@ -60,8 +60,7 @@ class Tracker:
         self._region_right = REGION_RIGHT_PCT
         self._region_bottom = REGION_BOTTOM_PCT
 
-        # Linux/Wayland: cached pixel region and change detection
-        self._pixel_region: tuple[int, int, int, int] | None = None
+        # Change detection
         self._prev_hash: bytes | None = None
 
     def set_zone(self, zone):
@@ -160,26 +159,24 @@ class Tracker:
         return best_s * 8
 
     def _capture(self):
-        """Wayland-native capture via grim. Uses configured output or all monitors."""
-        out_flag = ['-o', MONITOR_OUTPUT] if MONITOR_OUTPUT else []
-
-        if self._pixel_region is None:
-            result = subprocess.run(['grim'] + out_flag + ['-'], capture_output=True, check=True)
-            full_img = Image.open(io.BytesIO(result.stdout)).convert("RGB")
-            w, h = full_img.size
-            left = int(w * self._region_left)
-            top = int(h * self._region_top)
-            right = int(w * self._region_right)
-            bottom = int(h * self._region_bottom)
-            self._pixel_region = (left, top, right - left, bottom - top)
-            cropped = full_img.crop((left, top, right, bottom))
-        else:
-            x, y, w, h = self._pixel_region
+        """Wayland-native capture via grim. Captures selected monitor or all monitors,
+        then crops to the configured region."""
+        if MONITOR_GEOMETRY:
             result = subprocess.run(
-                ['grim'] + out_flag + ['-g', f'{x},{y} {w}x{h}', '-'],
-                capture_output=True, check=True
+                ['grim', '-g', MONITOR_GEOMETRY, '-'], capture_output=True, check=True
             )
-            cropped = Image.open(io.BytesIO(result.stdout)).convert("RGB")
+        else:
+            result = subprocess.run(['grim', '-'], capture_output=True, check=True)
+        full_img = Image.open(io.BytesIO(result.stdout)).convert("RGB")
+        w, h = full_img.size
+
+        # Always crop — no caching, since grim is fast and this avoids
+        # complex global-coordinate math with multi-monitor geometry.
+        left = int(w * self._region_left)
+        top = int(h * self._region_top)
+        right = int(w * self._region_right)
+        bottom = int(h * self._region_bottom)
+        cropped = full_img.crop((left, top, right, bottom))
 
         return cropped.resize((cropped.width * 2, cropped.height * 2), Image.LANCZOS)
 

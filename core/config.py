@@ -27,9 +27,9 @@ REGION_TOP_PCT    = float(os.getenv("REGION_TOP_PCT",    "0.72"))
 REGION_RIGHT_PCT  = float(os.getenv("REGION_RIGHT_PCT",  "1.0"))
 REGION_BOTTOM_PCT = float(os.getenv("REGION_BOTTOM_PCT", "0.88"))
 
-# Wayland output to capture. Set interactively by calibrate.py via slurp -o.
-# Empty string = capture all monitors as one spanned surface.
-MONITOR_OUTPUT = os.getenv("MONITOR_OUTPUT", "")
+# Wayland monitor geometry (set by calibrate.py via slurp -o).
+# Format: "x,y WxH" e.g. "0,0 1920x1080". Empty = capture all monitors.
+MONITOR_GEOMETRY = os.getenv("MONITOR_GEOMETRY", "")
 
 LOCAL_DB_PATH = Path(os.getenv("LOCAL_DB_PATH", str(BASE_DIR / "data" / "loot_tracker.db")))
 

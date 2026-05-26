@@ -61,12 +61,13 @@ DEBUG_IMAGE_PATH = Path(__file__).parent / "calibration_debug.png"
 
 
 def _pick_monitor() -> str:
-    """Prompt user to click on the BDO monitor via slurp -o, save to .env.
-    Call this BEFORE creating any tkinter window."""
+    """Prompt user to click on the BDO monitor via slurp -o, save its geometry.
+    Call this BEFORE creating any tkinter window.
+    Returns geometry string like '0,0 1920x1080' or '' on failure."""
     env_path = TRACKER_FILE.parent / ".env"
     from dotenv import load_dotenv
     load_dotenv(env_path)
-    existing = os.getenv("MONITOR_OUTPUT", "")
+    existing = os.getenv("MONITOR_GEOMETRY", "")
     if existing:
         return existing
 
@@ -80,11 +81,11 @@ def _pick_monitor() -> str:
         lines = []
         if env_path.exists():
             lines = env_path.read_text().splitlines()
-        lines = [l for l in lines if not l.startswith("MONITOR_OUTPUT=")]
-        lines.append(f"MONITOR_OUTPUT={output}")
+        lines = [l for l in lines if not l.startswith("MONITOR_GEOMETRY=")]
+        lines.append(f"MONITOR_GEOMETRY={output}")
         env_path.write_text("\n".join(lines) + "\n")
-        os.environ["MONITOR_OUTPUT"] = output
-        print(f"  → Selected monitor: {output}")
+        os.environ["MONITOR_GEOMETRY"] = output
+        print(f"  → Selected monitor geometry: {output}")
         return output
     except FileNotFoundError:
         print("  slurp not found — capturing all monitors.")
@@ -108,10 +109,14 @@ class CalibrationApp:
             self.full_img = source_image.convert("RGB")
             self.screen_w, self.screen_h = self.full_img.size
         else:
-            # Live mode: capture the selected monitor (or all if none selected).
-            monitor_output = os.getenv("MONITOR_OUTPUT", "")
-            out_flag = ['-o', monitor_output] if monitor_output else []
-            result = subprocess.run(['grim'] + out_flag + ['-'], capture_output=True, check=True)
+            # Live mode: capture selected monitor (or all if none selected).
+            monitor_geo = os.getenv("MONITOR_GEOMETRY", "")
+            if monitor_geo:
+                result = subprocess.run(
+                    ['grim', '-g', monitor_geo, '-'], capture_output=True, check=True
+                )
+            else:
+                result = subprocess.run(['grim', '-'], capture_output=True, check=True)
             self.full_img = Image.open(io.BytesIO(result.stdout)).convert("RGB")
             self.screen_w, self.screen_h = self.full_img.size
 
