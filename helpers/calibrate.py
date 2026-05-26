@@ -60,40 +60,6 @@ MIN_SIZE    = 40          # minimum box dimension in px
 DEBUG_IMAGE_PATH = Path(__file__).parent / "calibration_debug.png"
 
 
-def _pick_monitor() -> str:
-    """Prompt user to click on the BDO monitor via slurp -o, save its geometry.
-    Call this BEFORE creating any tkinter window.
-    Returns geometry string like '0,0 1920x1080' or '' on failure."""
-    env_path = TRACKER_FILE.parent / ".env"
-    from dotenv import load_dotenv
-    load_dotenv(env_path)
-    existing = os.getenv("MONITOR_GEOMETRY", "")
-    if existing:
-        return existing
-
-    print("Click on the monitor where BDO is running (cursor becomes a crosshair)...")
-    try:
-        output = subprocess.run(
-            ['slurp', '-o'], capture_output=True, text=True, check=True
-        ).stdout.strip()
-        if not output:
-            return ""
-        lines = []
-        if env_path.exists():
-            lines = env_path.read_text().splitlines()
-        lines = [l for l in lines if not l.startswith("MONITOR_GEOMETRY=")]
-        lines.append(f"MONITOR_GEOMETRY={output}")
-        env_path.write_text("\n".join(lines) + "\n")
-        os.environ["MONITOR_GEOMETRY"] = output
-        print(f"  → Selected monitor geometry: {output}")
-        return output
-    except FileNotFoundError:
-        print("  slurp not found — capturing all monitors.")
-        return ""
-    except subprocess.CalledProcessError:
-        print("  Monitor selection cancelled — capturing all monitors.")
-        return ""
-
 # ═════════════════════════════════════════════════════════════
 class CalibrationApp:
 
@@ -109,14 +75,8 @@ class CalibrationApp:
             self.full_img = source_image.convert("RGB")
             self.screen_w, self.screen_h = self.full_img.size
         else:
-            # Live mode: capture selected monitor (or all if none selected).
-            monitor_geo = os.getenv("MONITOR_GEOMETRY", "")
-            if monitor_geo:
-                result = subprocess.run(
-                    ['grim', '-g', monitor_geo, '-'], capture_output=True, check=True
-                )
-            else:
-                result = subprocess.run(['grim', '-'], capture_output=True, check=True)
+            # Live mode: capture all monitors via grim (Wayland-native).
+            result = subprocess.run(['grim', '-'], capture_output=True, check=True)
             self.full_img = Image.open(io.BytesIO(result.stdout)).convert("RGB")
             self.screen_w, self.screen_h = self.full_img.size
 
@@ -683,7 +643,6 @@ if __name__ == "__main__":
         source = Image.open(img_path)
         app = CalibrationApp(source_image=source)
     else:
-        _pick_monitor()  # select monitor before fullscreen window
         app = CalibrationApp()
 
     app.run()

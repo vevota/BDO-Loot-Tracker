@@ -265,7 +265,6 @@ if __name__ == "__main__":
         spec = importlib.util.spec_from_file_location("calibrate", cal_path)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-        mod._pick_monitor()  # select monitor before fullscreen window
         mod.CalibrationApp().run()
     else:
         main()

@@ -14,7 +14,6 @@ from .uploader import LootEvent
 from .config import (
     POLL_INTERVAL,
     CHARACTER_NAME,
-    MONITOR_GEOMETRY,
     REGION_LEFT_PCT,
     REGION_TOP_PCT,
     REGION_RIGHT_PCT,
@@ -159,25 +158,15 @@ class Tracker:
         return best_s * 8
 
     def _capture(self):
-        """Wayland-native capture via grim. Captures selected monitor or all monitors,
-        then crops to the configured region."""
-        if MONITOR_GEOMETRY:
-            result = subprocess.run(
-                ['grim', '-g', MONITOR_GEOMETRY, '-'], capture_output=True, check=True
-            )
-        else:
-            result = subprocess.run(['grim', '-'], capture_output=True, check=True)
+        """Wayland-native capture via grim (all monitors as one surface)."""
+        result = subprocess.run(['grim', '-'], capture_output=True, check=True)
         full_img = Image.open(io.BytesIO(result.stdout)).convert("RGB")
         w, h = full_img.size
-
-        # Always crop — no caching, since grim is fast and this avoids
-        # complex global-coordinate math with multi-monitor geometry.
         left = int(w * self._region_left)
         top = int(h * self._region_top)
         right = int(w * self._region_right)
         bottom = int(h * self._region_bottom)
         cropped = full_img.crop((left, top, right, bottom))
-
         return cropped.resize((cropped.width * 2, cropped.height * 2), Image.LANCZOS)
 
     def _preprocess_for_ocr(self, pil_img: Image.Image) -> Image.Image:
