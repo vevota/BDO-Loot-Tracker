@@ -27,10 +27,6 @@ REGION_TOP_PCT    = float(os.getenv("REGION_TOP_PCT",    "0.72"))
 REGION_RIGHT_PCT  = float(os.getenv("REGION_RIGHT_PCT",  "1.0"))
 REGION_BOTTOM_PCT = float(os.getenv("REGION_BOTTOM_PCT", "0.88"))
 
-# Wayland multi-monitor: set to output name (e.g. "HDMI-A-1") to capture only that monitor.
-# Find yours with: wlr-randr | grep -E '^\w'
-MONITOR_OUTPUT = os.getenv("MONITOR_OUTPUT", "")
-
 LOCAL_DB_PATH = Path(os.getenv("LOCAL_DB_PATH", str(BASE_DIR / "data" / "loot_tracker.db")))
 
 def _get_bool_env(key: str, default: bool) -> bool:
