@@ -61,7 +61,8 @@ DEBUG_IMAGE_PATH = Path(__file__).parent / "calibration_debug.png"
 
 
 def _pick_monitor() -> str:
-    """Prompt user to click on the BDO monitor via slurp -o, save to .env."""
+    """Prompt user to click on the BDO monitor via slurp -o, save to .env.
+    Call this BEFORE creating any tkinter window."""
     env_path = TRACKER_FILE.parent / ".env"
     from dotenv import load_dotenv
     load_dotenv(env_path)
@@ -69,15 +70,7 @@ def _pick_monitor() -> str:
     if existing:
         return existing
 
-    root = tk.Tk()
-    root.withdraw()
-    messagebox.showinfo(
-        "Select Monitor",
-        "Click anywhere on the monitor where BDO is running.\n\n"
-        "Your cursor will turn into a crosshair."
-    )
-    root.destroy()
-
+    print("Click on the monitor where BDO is running (cursor becomes a crosshair)...")
     try:
         output = subprocess.run(
             ['slurp', '-o'], capture_output=True, text=True, check=True
@@ -91,9 +84,13 @@ def _pick_monitor() -> str:
         lines.append(f"MONITOR_OUTPUT={output}")
         env_path.write_text("\n".join(lines) + "\n")
         os.environ["MONITOR_OUTPUT"] = output
+        print(f"  → Selected monitor: {output}")
         return output
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"Monitor selection failed: {e}")
+    except FileNotFoundError:
+        print("  slurp not found — capturing all monitors.")
+        return ""
+    except subprocess.CalledProcessError:
+        print("  Monitor selection cancelled — capturing all monitors.")
         return ""
 
 # ═════════════════════════════════════════════════════════════
@@ -112,7 +109,7 @@ class CalibrationApp:
             self.screen_w, self.screen_h = self.full_img.size
         else:
             # Live mode: capture the selected monitor (or all if none selected).
-            monitor_output = _pick_monitor()
+            monitor_output = os.getenv("MONITOR_OUTPUT", "")
             out_flag = ['-o', monitor_output] if monitor_output else []
             result = subprocess.run(['grim'] + out_flag + ['-'], capture_output=True, check=True)
             self.full_img = Image.open(io.BytesIO(result.stdout)).convert("RGB")
@@ -681,6 +678,7 @@ if __name__ == "__main__":
         source = Image.open(img_path)
         app = CalibrationApp(source_image=source)
     else:
+        _pick_monitor()  # select monitor before fullscreen window
         app = CalibrationApp()
 
     app.run()
