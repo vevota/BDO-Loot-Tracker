@@ -24,6 +24,7 @@ from __future__ import annotations
 import io
 import os
 import re
+import subprocess
 import sys
 import time
 import tkinter as tk
@@ -31,7 +32,6 @@ from tkinter import font as tkfont
 from tkinter import messagebox
 from pathlib import Path
 from PIL import Image, ImageTk, ImageEnhance, ImageFilter, ImageDraw, ImageFont
-import mss
 
 # ── Tesseract OCR ─────────────────────────────────────────────
 try:
@@ -74,15 +74,10 @@ class CalibrationApp:
             self.full_img = source_image.convert("RGB")
             self.screen_w, self.screen_h = self.full_img.size
         else:
-            # Live mode: grab the primary monitor.
-            with mss.mss() as sct:
-                mon = sct.monitors[1]
-                self.screen_w = mon["width"]
-                self.screen_h = mon["height"]
-                raw = sct.grab(mon)
-                self.full_img = Image.frombytes(
-                    "RGB", raw.size, raw.bgra, "raw", "BGRX"
-                )
+            # Live mode: grab the primary monitor via grim (Wayland-native).
+            result = subprocess.run(['grim', '-'], capture_output=True, check=True)
+            self.full_img = Image.open(io.BytesIO(result.stdout)).convert("RGB")
+            self.screen_w, self.screen_h = self.full_img.size
 
         # dim the screenshot so the selection stands out
         self.dim_img = ImageEnhance.Brightness(self.full_img).enhance(0.35)

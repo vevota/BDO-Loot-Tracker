@@ -1,9 +1,13 @@
+import hashlib
+import io
+import subprocess
 import threading
 import time
 
-import mss
+import cv2
+import numpy as np
 import pytesseract
-from PIL import Image, ImageFilter
+from PIL import Image
 
 from .parser import parse_loot, resolve_batch_zone_overrides
 from .uploader import LootEvent
@@ -54,6 +58,10 @@ class Tracker:
         self._region_top = REGION_TOP_PCT
         self._region_right = REGION_RIGHT_PCT
         self._region_bottom = REGION_BOTTOM_PCT
+
+        # Linux/Wayland: cached pixel region and change detection
+        self._pixel_region: tuple[int, int, int, int] | None = None
+        self._prev_hash: bytes | None = None
 
     def set_zone(self, zone):
         self._zone = zone
@@ -151,43 +159,39 @@ class Tracker:
         return best_s * 8
 
     def _capture(self):
-        with mss.mss() as sct:
-            monitor = sct.monitors[1]
-            w, h = monitor["width"], monitor["height"]
+        """Wayland-native capture using grim (cropped to configured region)."""
+        if self._pixel_region is None:
+            result = subprocess.run(['grim', '-'], capture_output=True, check=True)
+            full_img = Image.open(io.BytesIO(result.stdout)).convert("RGB")
+            w, h = full_img.size
+            left = int(w * self._region_left)
+            top = int(h * self._region_top)
+            right = int(w * self._region_right)
+            bottom = int(h * self._region_bottom)
+            self._pixel_region = (left, top, right - left, bottom - top)
+            cropped = full_img.crop((left, top, right, bottom))
+        else:
+            x, y, w, h = self._pixel_region
+            result = subprocess.run(
+                ['grim', '-g', f'{x},{y} {w}x{h}', '-'],
+                capture_output=True, check=True
+            )
+            cropped = Image.open(io.BytesIO(result.stdout)).convert("RGB")
 
-            region = {
-                "left": int(w * self._region_left),
-                "top": int(h * self._region_top),
-                "width": int(w * (self._region_right - self._region_left)),
-                "height": int(h * (self._region_bottom - self._region_top)),
-            }
-
-            img = sct.grab(region)
-
-        raw = Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
-        return raw.resize((raw.width * 2, raw.height * 2), Image.LANCZOS)
+        return cropped.resize((cropped.width * 2, cropped.height * 2), Image.LANCZOS)
 
     def _preprocess_for_ocr(self, pil_img: Image.Image) -> Image.Image:
         """
         Isolate bright text (white, orange, gold, yellow) against the dark
-        acquisition log background. Uses peak channel so coloured text is kept.
+        acquisition log background. Uses OpenCV for speed.
         """
-        BRIGHT_MIN = 135
-
-        rgb  = pil_img.convert("RGB")
-        data = rgb.load()
-        w, h = rgb.size
-
-        out = Image.new("L", (w, h), 255)
-        pix = out.load()
-
-        for y in range(h):
-            for x in range(w):
-                r, g, b = data[x, y]
-                if max(r, g, b) > BRIGHT_MIN:
-                    pix[x, y] = 0
-        out = out.filter(ImageFilter.MinFilter(3))
-        return out
+        rgb = pil_img.convert("RGB")
+        arr = np.array(rgb, dtype=np.uint8)
+        gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+        _, thresh = cv2.threshold(gray, 135, 255, cv2.THRESH_BINARY)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        cleaned = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+        return Image.fromarray(cleaned, mode="L")
 
     def _fire_events_from_strip(self, processed_img: Image.Image, shift_px: int) -> None:
         pw, ph = processed_img.size
@@ -220,6 +224,14 @@ class Tracker:
 
                 if self._on_ocr_frame:
                     self._on_ocr_frame(img, processed_img)
+
+                # Change detection: skip OCR if image hasn't changed
+                img_bytes = processed_img.tobytes()
+                img_hash = hashlib.md5(img_bytes).digest()
+                if self._prev_hash == img_hash:
+                    time.sleep(POLL_INTERVAL)
+                    continue
+                self._prev_hash = img_hash
 
                 if prev_processed is None:
                     prev_processed = processed_img

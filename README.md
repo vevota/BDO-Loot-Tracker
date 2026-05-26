@@ -4,17 +4,58 @@ An open source, real-time loot tracking overlay for **Black Desert Online**. It 
 
 ---
 
+## Linux / Wayland
+
+This fork adds native Wayland support using `grim` + `slurp` (replaces `mss`).
+
+### Dependencies (Arch Linux)
+
+```bash
+pacman -S tesseract grim slurp \
+          python-pillow python-pytesseract python-dotenv python-pystray python-requests
+```
+
+### Setup
+
+```bash
+git clone https://github.com/vevota/BDO-Loot-Tracker
+cd BDO-Loot-Tracker
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Copy env and edit your character name
+cp env.example .env
+# Run calibration to set the capture region
+python main.py --calibrate
+# Start the tracker
+python main.py
+```
+
+### Calibration (Wayland)
+
+1. Run `python main.py --calibrate`
+2. Click and drag to select the area where loot notifications appear
+3. Press Space/Enter to confirm and test OCR
+4. Press Enter again to save
+
+Alternatively, skip the GUI and manually edit `.env` with `REGION_LEFT_PCT`, `REGION_TOP_PCT`, etc.
+
+---
+
+## Windows
+
 Download the latest version [here](https://github.com/janhnguyen/BDO-Loot-Tracker/releases).
 
-Questions, comments, or concerns? Get in contact with me through my [discord](https://discord.com/invite/uZYJfGphBP).
-
-### Dependencies
+### Dependencies (Windows)
 
 **Tesseract OCR** - [Download here](https://github.com/UB-Mannheim/tesseract/wiki)  
 During installation, leave the default options checked (this adds Tesseract to your PATH automatically).
 
 If you skipped that option, add it manually:  
 Control Panel → Edit the system environment variables → Advanced → Environment Variables → Edit Path (under User Variables) → New → `C:\Program Files\Tesseract-OCR`
+
+---
 
 ## Features
 
