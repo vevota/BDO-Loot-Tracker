@@ -46,6 +46,11 @@ if getattr(sys, "frozen", False):
 else:
     TRACKER_FILE = Path(__file__).resolve().parent.parent / ".env"
 
+# Load MONITOR_OUTPUT from .env so multi-monitor capture works
+from dotenv import load_dotenv
+load_dotenv(TRACKER_FILE.parent / ".env")
+_MONITOR_OUTPUT = os.getenv("MONITOR_OUTPUT", "")
+
 ACCENT      = "#D4A017"   # BDO gold
 ACCENT_DIM  = "#9A7510"
 RED         = "#E05050"
@@ -74,8 +79,9 @@ class CalibrationApp:
             self.full_img = source_image.convert("RGB")
             self.screen_w, self.screen_h = self.full_img.size
         else:
-            # Live mode: grab the primary monitor via grim (Wayland-native).
-            result = subprocess.run(['grim', '-'], capture_output=True, check=True)
+            # Live mode: grab via grim (Wayland-native).
+            out_flag = ['-o', _MONITOR_OUTPUT] if _MONITOR_OUTPUT else []
+            result = subprocess.run(['grim'] + out_flag + ['-'], capture_output=True, check=True)
             self.full_img = Image.open(io.BytesIO(result.stdout)).convert("RGB")
             self.screen_w, self.screen_h = self.full_img.size
 

@@ -14,6 +14,7 @@ from .uploader import LootEvent
 from .config import (
     POLL_INTERVAL,
     CHARACTER_NAME,
+    MONITOR_OUTPUT,
     REGION_LEFT_PCT,
     REGION_TOP_PCT,
     REGION_RIGHT_PCT,
@@ -160,8 +161,10 @@ class Tracker:
 
     def _capture(self):
         """Wayland-native capture using grim (cropped to configured region)."""
+        out_flag = ['-o', MONITOR_OUTPUT] if MONITOR_OUTPUT else []
+
         if self._pixel_region is None:
-            result = subprocess.run(['grim', '-'], capture_output=True, check=True)
+            result = subprocess.run(['grim'] + out_flag + ['-'], capture_output=True, check=True)
             full_img = Image.open(io.BytesIO(result.stdout)).convert("RGB")
             w, h = full_img.size
             left = int(w * self._region_left)
@@ -173,7 +176,7 @@ class Tracker:
         else:
             x, y, w, h = self._pixel_region
             result = subprocess.run(
-                ['grim', '-g', f'{x},{y} {w}x{h}', '-'],
+                ['grim'] + out_flag + ['-g', f'{x},{y} {w}x{h}', '-'],
                 capture_output=True, check=True
             )
             cropped = Image.open(io.BytesIO(result.stdout)).convert("RGB")
