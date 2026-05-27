@@ -152,22 +152,22 @@ def _norm_digits(s: str) -> str:
              .replace('O', '0').replace('o', '0'))
 
 def parse_loot(text: str):
-    # Expected line format: You have obtained ● [Item Name] xN
     results = []
     for line in text.splitlines():
         line = line.strip()
         if not line:
             continue
-        if '[' not in line or ']' not in line:
-            continue
-        line_stripped = re.sub(r'\bevent\b', '', line.replace("[", "").replace("]", ""), flags=re.IGNORECASE).strip()
+
+        if '[' in line and ']' in line:
+            line_stripped = re.sub(r'\bevent\b', '', line.replace("[", "").replace("]", ""), flags=re.IGNORECASE).strip()
+        else:
+            line_stripped = line
         line_stripped = line_stripped.replace('\u2019', "'").replace('\u2018', "'").replace('`', "'").replace('THAN','HAN')
         line_lc = line_stripped.lower()
         for name in ITEM_NAMES:
             idx = line_lc.find(name.lower())
             if idx == -1:
                 continue
-            # Search for quantity only in the text that follows the item name
             after = line_stripped[idx + len(name):]
             m = re.search(r'[xX×]\s*([0-9|!lI\[\]Oo]{1,6})', after)
             if m:
@@ -179,7 +179,6 @@ def parse_loot(text: str):
                 except Exception:
                     pass
             else:
-                # No quantity present treat as x1
                 results.append((name, 1))
                 break
     return results
