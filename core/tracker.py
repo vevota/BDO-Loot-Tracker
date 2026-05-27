@@ -59,8 +59,9 @@ class Tracker:
         self._region_right = REGION_RIGHT_PCT
         self._region_bottom = REGION_BOTTOM_PCT
 
-        # Change detection
+        # Change detection + crop caching
         self._prev_hash: bytes | None = None
+        self._pixel_region: tuple[int, int, int, int] | None = None
 
     def set_zone(self, zone):
         self._zone = zone
@@ -82,6 +83,7 @@ class Tracker:
         self._region_top = top
         self._region_right = right
         self._region_bottom = bottom
+        self._pixel_region = None  # recalculate on next capture
 
     def is_running(self):
         return self._running
@@ -158,15 +160,24 @@ class Tracker:
         return best_s * 8
 
     def _capture(self):
-        """Wayland-native capture via grim (all monitors as one surface)."""
-        result = subprocess.run(['grim', '-'], capture_output=True, check=True)
-        full_img = Image.open(io.BytesIO(result.stdout)).convert("RGB")
-        w, h = full_img.size
-        left = int(w * self._region_left)
-        top = int(h * self._region_top)
-        right = int(w * self._region_right)
-        bottom = int(h * self._region_bottom)
-        cropped = full_img.crop((left, top, right, bottom))
+        """Wayland-native capture via grim. Caches crop region for speed."""
+        if self._pixel_region is None:
+            result = subprocess.run(['grim', '-'], capture_output=True, check=True)
+            full_img = Image.open(io.BytesIO(result.stdout)).convert("RGB")
+            w, h = full_img.size
+            left = int(w * self._region_left)
+            top = int(h * self._region_top)
+            right = int(w * self._region_right)
+            bottom = int(h * self._region_bottom)
+            self._pixel_region = (left, top, right - left, bottom - top)
+            cropped = full_img.crop((left, top, right, bottom))
+        else:
+            x, y, w, h = self._pixel_region
+            result = subprocess.run(
+                ['grim', '-g', f'{x},{y} {w}x{h}', '-'],
+                capture_output=True, check=True
+            )
+            cropped = Image.open(io.BytesIO(result.stdout)).convert("RGB")
         return cropped.resize((cropped.width * 2, cropped.height * 2), Image.LANCZOS)
 
     def _preprocess_for_ocr(self, pil_img: Image.Image) -> Image.Image:

@@ -18,7 +18,7 @@ SUPABASE_KEY   = os.getenv("SUPABASE_KEY")
 CHARACTER_NAME = os.getenv("CHARACTER_NAME", "MyCharacter")
 DEFAULT_ZONE   = os.getenv("DEFAULT_ZONE", "Unknown")
 
-POLL_INTERVAL = float(os.getenv("POLL_INTERVAL", "0.5"))
+POLL_INTERVAL = float(os.getenv("POLL_INTERVAL", "0.2"))
 SESSION_RESET_DELAY_SECONDS = float(os.getenv("SESSION_RESET_DELAY_SECONDS", "1.5"))
 TRACKING_WINDOW_SIZE = int(os.getenv("TRACKING_WINDOW_SIZE", "20"))
 
