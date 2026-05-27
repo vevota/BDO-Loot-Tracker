@@ -244,13 +244,16 @@ def main():
         update_market_prices_cb=update_market_prices,
     )
 
-    # Run tray, passing tracker methods
-    run_tray(
-        start=start_session,
-        stop=stop_session,
-        set_zone=tracker.set_zone,
-        show_log=log_window.show
-    )
+    # Run tray, passing tracker methods (silently skip on Wayland)
+    try:
+        run_tray(
+            start=start_session,
+            stop=stop_session,
+            set_zone=tracker.set_zone,
+            show_log=log_window.show
+        )
+    except Exception:
+        pass
 
     # Run the UI loop
     log_window.run()
